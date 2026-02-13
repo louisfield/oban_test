@@ -42,6 +42,16 @@ defmodule ObanTest do
     |> Oban.insert_all()
   end
 
+  @spec test_oban_scheduled_with_graft_v3() :: [Oban.Job.t()] | Ecto.Multi.t()
+  def test_oban_scheduled_with_graft_v3() do
+    Workflow.new()
+    |> Workflow.add(:a, TestWorker.new(%{}))
+    |> Workflow.add(:b, TestWorker.new(%{}), deps: [:a])
+    |> Workflow.add_graft(:loop_start, TestWorker.new(%{run_loop_3: true}), deps: [:b])
+    |> Workflow.add(:loop_end, TestWorker.new(%{}), deps: [:loop_start])
+    |> Oban.insert_all()
+  end
+
   def test_oban_scheduled_retry() do
     workflow =
       Workflow.new()

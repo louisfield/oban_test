@@ -7,13 +7,42 @@ defmodule ObanTest.TestWorker do
 
   @impl Oban.Pro.Worker
   @spec process(Job.t()) :: :retryable
-  def process(%Job{args: %{"run_loop_2" => true}} = job) do
+  def process(%Job{args: %{"run_loop_2" => true}}) do
     ids = Enum.map(1..20000, &String.to_atom("loop-#{&1}"))
 
     workflow =
       ids
       |> Enum.reduce(Workflow.new(), fn val, acc ->
         Workflow.add(acc, val, TestWorker.new(%{}))
+      end)
+
+    workflow
+    |> Workflow.apply_graft()
+    |> Oban.insert_all()
+
+    {:ok, "hello"}
+  end
+
+  def process(%Job{args: %{"do_bundle" => true}}) do
+    1..10
+    |> Enum.reduce(Workflow.new(), fn val, acc ->
+      deps = if val == 1, do: [], else: ["bundle-#{val - 1}"]
+      Workflow.add(acc, "bundle-#{val}", TestWorker.new(%{}), deps: deps)
+    end)
+    |> Workflow.apply_graft()
+    |> Oban.insert_all()
+
+    {:ok, "hello"}
+  end
+
+  def process(%Job{args: %{"run_loop_3" => true}}) do
+    ids = Enum.map(1..10000, &String.to_atom("loop-#{&1}"))
+
+    workflow =
+      ids
+      |> Enum.reduce(Workflow.new(), fn val, acc ->
+        acc
+        |> Workflow.add_graft("loop-bundle-#{val}", TestWorker.new(%{do_bundle: true}))
       end)
 
     workflow
